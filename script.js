@@ -217,18 +217,19 @@ function updateFeedTitle() {
   }
 }
 
+// store last snapshot so filters work instantly
+let lastSnapshotDocs = [];
+
 function setupPostsListener() {
   const q = query(postsCol, orderBy("createdAt", "desc"));
   onSnapshot(q, (snapshot) => {
-    // keep all posts in memory and filter client-side
-    const all = [];
+    lastSnapshotDocs = [];
     snapshot.forEach((docSnap) => {
-      all.push({ id: docSnap.id, docSnap });
+      lastSnapshotDocs.push({ id: docSnap.id, docSnap });
     });
-    renderFilteredPosts(all);
+    renderFilteredPosts(lastSnapshotDocs);
   });
 }
-
 function renderFilteredPosts(allPosts) {
   clearPosts();
 
