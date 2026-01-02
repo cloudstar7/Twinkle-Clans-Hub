@@ -245,7 +245,7 @@ function renderFilteredPosts(allPosts) {
   }
 
   filtered.forEach((p) => {
-    const postEl = renderPost(p.docSnap);
+    const postEl = renderPost(p);
     postsContainer.appendChild(postEl);
   });
 }
@@ -306,13 +306,9 @@ function setupClanButtons() {
     btn.addEventListener("click", () => {
       clanButtons.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      currentClanFilter = btn.dataset.clan;
+      currentClanFilter = btn.dataset.clan; // VERY IMPORTANT
       updateFeedTitle();
-      // the snapshot listener re-renders whenever data changes,
-      // but we also need to re-filter locally:
-      // easiest is to force a tiny reload using another query fetch:
-      // (simpler approach for now: just rely on onSnapshot's last data;
-      // we can store it in a variable.)
+      renderFilteredPosts(lastSnapshotDocs);
     });
   });
 }
