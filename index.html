@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Twinkle Clans Hub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+  <!-- Firebase SDKs -->
+  <script type="module" src="script.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>Twinkle Clans Hub</h1>
+    <p class="subtitle">News center for WindClan, RiverClan, ThunderClan, and ShadowClan</p>
+  </header>
+
+  <section class="top-bar">
+    <div class="username-box">
+      <label for="usernameInput">Username:</label>
+      <input id="usernameInput" type="text" placeholder="Enter your username" />
+      <button id="setUsernameBtn">Set Username</button>
+      <span id="currentUserLabel"></span>
+    </div>
+
+    <div class="role-info">
+      <span id="roleBadge">Visitor</span>
+      <span class="hint">Only Cloudstar and promoted users can post.</span>
+    </div>
+  </section>
+
+  <main class="layout">
+    <aside class="left-panel">
+      <h2>Clans</h2>
+      <div class="clan-buttons">
+        <button class="clan-btn active" data-clan="all">All Clans</button>
+        <button class="clan-btn" data-clan="WindClan">WindClan</button>
+        <button class="clan-btn" data-clan="RiverClan">RiverClan</button>
+        <button class="clan-btn" data-clan="ThunderClan">ThunderClan</button>
+        <button class="clan-btn" data-clan="ShadowClan">ShadowClan</button>
+      </div>
+
+      <div class="poster-controls" id="posterControls" style="display:none;">
+        <h3>New Post</h3>
+        <label for="postClanSelect">Clan:</label>
+        <select id="postClanSelect">
+          <option value="WindClan">WindClan</option>
+          <option value="RiverClan">RiverClan</option>
+          <option value="ThunderClan">ThunderClan</option>
+          <option value="ShadowClan">ShadowClan</option>
+        </select>
+
+        <label for="postTitleInput">Title:</label>
+        <input id="postTitleInput" type="text" placeholder="Short title" />
+
+        <label for="postBodyInput">Message:</label>
+        <textarea id="postBodyInput" rows="4" placeholder="Write your news..."></textarea>
+
+        <button id="publishBtn">Publish</button>
+        <p class="tiny-hint">Posts are public and visible to everyone.</p>
+      </div>
+
+      <div class="owner-controls" id="ownerControls" style="display:none;">
+        <h3>Owner Panel (Cloudstar)</h3>
+        <label for="promoteInput">Promote user:</label>
+        <input id="promoteInput" type="text" placeholder="Username to promote" />
+        <button id="promoteBtn">Promote</button>
+        <ul id="promotedList"></ul>
+      </div>
+    </aside>
+
+    <section class="main-panel">
+      <h2 id="feedTitle">All Clan News</h2>
+      <div id="postsContainer" class="posts-container">
+        <!-- posts go here -->
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Created by Cloudstar · Powered by Firebase</p>
+  </footer>
+</body>
+</html>
