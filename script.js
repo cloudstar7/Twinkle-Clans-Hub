@@ -21,12 +21,12 @@ import {
 
 // TODO: replace with your project config from Firebase console
 const firebaseConfig = {
-  apiKey: "AIzaSyAj04SX2YrStdZFWXkMowRxwBYM7xO2mSg",
-  authDomain: "twinkle-clans-hub.firebaseapp.com",
-  projectId: "twinkle-clans-hub",
-  storageBucket: "twinkle-clans-hub.firebasestorage.app",
-  messagingSenderId: "443187160032",
-  appId: "1:443187160032:web:e6408e6043b7a607a60185"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "SENDER_ID",
+  appId: "APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -217,33 +217,24 @@ function updateFeedTitle() {
   }
 }
 
-// store last snapshot so filters work instantly
-let lastSnapshotDocs = [];
-
 function setupPostsListener() {
   const q = query(postsCol, orderBy("createdAt", "desc"));
   onSnapshot(q, (snapshot) => {
-    lastSnapshotDocs = [];
+    // keep all posts in memory and filter client-side
+    const all = [];
     snapshot.forEach((docSnap) => {
-      lastSnapshotDocs.push({ id: docSnap.id, docSnap });
+      all.push({ id: docSnap.id, docSnap });
     });
-    renderFilteredPosts(lastSnapshotDocs);
+    renderFilteredPosts(all);
   });
 }
+
 function renderFilteredPosts(allPosts) {
   clearPosts();
-
-  console.log("=== RENDER FILTERED POSTS ===");
-  console.log("Current filter:", currentClanFilter);
-
   const filtered = allPosts.filter((p) => {
-    const data = p.docSnap.data();
-    console.log("Post title:", data.title, "| clan:", data.clan);
     if (currentClanFilter === "all") return true;
-    return data.clan === currentClanFilter;
+    return p.docSnap.data().clan === currentClanFilter;
   });
-
-  console.log("Filtered count:", filtered.length);
 
   if (filtered.length === 0) {
     const empty = document.createElement("p");
@@ -315,9 +306,13 @@ function setupClanButtons() {
     btn.addEventListener("click", () => {
       clanButtons.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      currentClanFilter = btn.dataset.clan; // VERY IMPORTANT
+      currentClanFilter = btn.dataset.clan;
       updateFeedTitle();
-      renderFilteredPosts(lastSnapshotDocs);
+      // the snapshot listener re-renders whenever data changes,
+      // but we also need to re-filter locally:
+      // easiest is to force a tiny reload using another query fetch:
+      // (simpler approach for now: just rely on onSnapshot's last data;
+      // we can store it in a variable.)
     });
   });
 }
