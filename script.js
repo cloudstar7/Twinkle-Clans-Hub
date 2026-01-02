@@ -21,12 +21,12 @@ import {
 
 // TODO: replace with your project config from Firebase console
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "SENDER_ID",
-  appId: "APP_ID"
+  apiKey: "AIzaSyAj04SX2YrStdZFWXkMowRxwBYM7xO2mSg",
+  authDomain: "twinkle-clans-hub.firebaseapp.com",
+  projectId: "twinkle-clans-hub",
+  storageBucket: "twinkle-clans-hub.firebasestorage.app",
+  messagingSenderId: "443187160032",
+  appId: "1:443187160032:web:e6408e6043b7a607a60185"
 };
 
 const app = initializeApp(firebaseConfig);
