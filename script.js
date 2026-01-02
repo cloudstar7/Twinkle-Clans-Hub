@@ -231,10 +231,18 @@ function setupPostsListener() {
 
 function renderFilteredPosts(allPosts) {
   clearPosts();
+
+  console.log("=== RENDER FILTERED POSTS ===");
+  console.log("Current filter:", currentClanFilter);
+
   const filtered = allPosts.filter((p) => {
+    const data = p.docSnap.data();
+    console.log("Post title:", data.title, "| clan:", data.clan);
     if (currentClanFilter === "all") return true;
-    return p.docSnap.data().clan === currentClanFilter;
+    return data.clan === currentClanFilter;
   });
+
+  console.log("Filtered count:", filtered.length);
 
   if (filtered.length === 0) {
     const empty = document.createElement("p");
@@ -245,7 +253,7 @@ function renderFilteredPosts(allPosts) {
   }
 
   filtered.forEach((p) => {
-    const postEl = renderPost(p);
+    const postEl = renderPost(p.docSnap);
     postsContainer.appendChild(postEl);
   });
 }
