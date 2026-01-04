@@ -26,8 +26,6 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-
-const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const postsCol = collection(db, "clanPosts");
@@ -35,13 +33,27 @@ const metaDocRef = doc(db, "meta", "roles");
 
 // 2. STATE
 const OWNER_USERNAME = "Cloudstar";
+const postsCol = collection(db, "clanPosts");
+const metaDocRef = doc(db, "meta", "roles");
+
+// 2. STATE
+const OWNER_USERNAME = "Cloudstar";
+
+// FIXED PASSWORDS
+const OWNER_PASSWORD = "Cloudstar7Wind";
+const FIXED_POSTER_PASSWORDS = {
+  "Pinestar(0)": "PineThunder",
+  "Grapestar(1)": "GrapeShadow",
+  "Willowshine(2)": "Willowshine7",
+  "Lakestar(3)": "LakestarRiver"
+};
 
 let currentUser = null;
 let currentRole = "visitor";
 let currentClanFilter = "all";
 let promotedUsers = [];
-let posterPasswords = {}; // { username: password }
-let ownerPassword = "";   // string
+let posterPasswords = { ...FIXED_POSTER_PASSWORDS }; // start with fixed ones
+let ownerPassword = OWNER_PASSWORD; // keep for compatibility
 let lastSnapshotDocs = [];
 
 // 3. DOM
@@ -71,27 +83,23 @@ const clanButtons = document.querySelectorAll(".clan-btn");
 async function loadRoles() {
   const snap = await getDoc(metaDocRef);
   if (!snap.exists()) {
-    // First time setup: create basic structure
+    // First time: create promoted list for your fixed posters only
+    const initialPromoted = Object.keys(FIXED_POSTER_PASSWORDS);
     await setDoc(metaDocRef, {
-      promoted: [],
-      ownerPassword: "changeThisOwnerCode",
-      posterPasswords: {}
+      promoted: initialPromoted
     });
-    promotedUsers = [];
-    ownerPassword = "changeThisOwnerCode";
-    posterPasswords = {};
-    alert(
-      "Owner password initialized as 'changeThisOwnerCode'. " +
-      "Please log in as Cloudstar with that password and change it in Firestore!"
-    );
+    promotedUsers = initialPromoted;
   } else {
     const data = snap.data();
-    promotedUsers = data.promoted || [];
-    ownerPassword = data.ownerPassword || "changeThisOwnerCode";
-    posterPasswords = data.posterPasswords || {};
+    promotedUsers = data.promoted || Object.keys(FIXED_POSTER_PASSWORDS);
   }
+
+  // Always enforce our fixed passwords in code
+  posterPasswords = { ...FIXED_POSTER_PASSWORDS };
+  ownerPassword = OWNER_PASSWORD;
+
   renderPromotedList();
-  updateRoleFromUsername(); // but will check password
+  updateRoleFromUsername();
 }
 
 function renderPromotedList() {
@@ -391,20 +399,20 @@ function setupClanButtons() {
 }
 
 // 8. INIT
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+window.addEventListener("DOMContentLoaded", async () => {
+  const stored = localStorage.getItem("tch_username");
+  if (stored) {
+    currentUser = stored;
+    usernameInput.value = stored;
+  }
 
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyAj04SX2YrStdZFWXkMowRxwBYM7xO2mSg",
-  authDomain: "twinkle-clans-hub.firebaseapp.com",
-  projectId: "twinkle-clans-hub",
-  storageBucket: "twinkle-clans-hub.firebasestorage.app",
-  messagingSenderId: "443187160032",
-  appId: "1:443187160032:web:e6408e6043b7a607a60185"
-};
+  setUsernameBtn.addEventListener("click", setUsernameAndRole);
+  publishBtn.addEventListener("click", publishPost);
+  promoteBtn.addEventListener("click", promoteUser);
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+  setupClanButtons();
+  updateFeedTitle();
+
+  await loadRoles();
+  setupPostsListener();
+});
