@@ -14,15 +14,23 @@ import {
   deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// 1. YOUR FIREBASE CONFIG (FILL THIS WITH YOUR REAL CONFIG)
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "SENDER_ID",
-  appId: "APP_ID"
+  apiKey: "AIzaSyAj04SX2YrStdZFWXkMowRxwBYM7xO2mSg",
+  authDomain: "twinkle-clans-hub.firebaseapp.com",
+  projectId: "twinkle-clans-hub",
+  storageBucket: "twinkle-clans-hub.firebasestorage.app",
+  messagingSenderId: "443187160032",
+  appId: "1:443187160032:web:e6408e6043b7a607a60185"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
