@@ -166,11 +166,13 @@ function updateRoleFromUsername() {
 
   // Owner check
   if (currentUser === OWNER_USERNAME) {
-    if (pwd && pwd === ownerPassword) {
+    if (pwd && pwd === OWNER_PASSWORD) {
       currentRole = "owner";
     } else {
       currentRole = "visitor";
-      alert("Wrong password for Cloudstar.");
+      if (pwd !== "") {
+        alert("Wrong password for Cloudstar.");
+      }
     }
   }
   // Poster check
@@ -180,7 +182,9 @@ function updateRoleFromUsername() {
       currentRole = "poster";
     } else {
       currentRole = "visitor";
-      alert("Wrong password for poster account.");
+      if (pwd !== "") {
+        alert("Wrong password for poster account.");
+      }
     }
   }
   // Visitor
@@ -361,6 +365,7 @@ async function publishPost() {
 }
 
 // 6. USERNAME + PASSWORD LOGIN
+// 6. USERNAME + PASSWORD LOGIN
 function setUsernameAndRole() {
   const name = usernameInput.value.trim();
   if (!name) {
@@ -377,7 +382,6 @@ function setUsernameAndRole() {
   localStorage.setItem("tch_username", currentUser);
   updateRoleFromUsername();
 }
-
 // 7. CLAN BUTTONS
 function setupClanButtons() {
   clanButtons.forEach((btn) => {
@@ -392,20 +396,20 @@ function setupClanButtons() {
 }
 
 // 8. INIT
-window.addEventListener("DOMContentLoaded", async () => {
-  const stored = localStorage.getItem("tch_username");
-  if (stored) {
-    currentUser = stored;
-    usernameInput.value = stored;
-  }
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-  setUsernameBtn.addEventListener("click", setUsernameAndRole);
-  publishBtn.addEventListener("click", publishPost);
-  promoteBtn.addEventListener("click", promoteUser);
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyAj04SX2YrStdZFWXkMowRxwBYM7xO2mSg",
+  authDomain: "twinkle-clans-hub.firebaseapp.com",
+  projectId: "twinkle-clans-hub",
+  storageBucket: "twinkle-clans-hub.firebasestorage.app",
+  messagingSenderId: "443187160032",
+  appId: "1:443187160032:web:e6408e6043b7a607a60185"
+};
 
-  setupClanButtons();
-  updateFeedTitle();
-
-  await loadRoles();
-  setupPostsListener();
-});
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
