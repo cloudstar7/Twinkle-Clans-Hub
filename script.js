@@ -1,4 +1,3 @@
-// script.js
 import {
   initializeApp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -12,21 +11,17 @@ import {
   doc,
   setDoc,
   getDoc,
-  getDocs
+  deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// =====================
-// 1. CONFIGURE FIREBASE
-// =====================
-
-// TODO: replace with your project config from Firebase console
+// 1. YOUR FIREBASE CONFIG (FILL THIS WITH YOUR REAL CONFIG)
 const firebaseConfig = {
-  apiKey: "AIzaSyAj04SX2YrStdZFWXkMowRxwBYM7xO2mSg",
-  authDomain: "twinkle-clans-hub.firebaseapp.com",
-  projectId: "twinkle-clans-hub",
-  storageBucket: "twinkle-clans-hub.firebasestorage.app",
-  messagingSenderId: "443187160032",
-  appId: "1:443187160032:web:e2e8e3e9d47ecaa0a60185"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "SENDER_ID",
+  appId: "APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -35,21 +30,20 @@ const db = getFirestore(app);
 const postsCol = collection(db, "clanPosts");
 const metaDocRef = doc(db, "meta", "roles");
 
-// =================
-// 2. BASIC STATE
-// =================
-
+// 2. STATE
 const OWNER_USERNAME = "Cloudstar";
 
 let currentUser = null;
-let currentRole = "visitor"; // "owner" | "poster" | "visitor"
+let currentRole = "visitor";
 let currentClanFilter = "all";
+let promotedUsers = [];
+let posterPasswords = {}; // { username: password }
+let ownerPassword = "";   // string
+let lastSnapshotDocs = [];
 
-// =================
-// 3. DOM REFERENCES
-// =================
-
+// 3. DOM
 const usernameInput = document.getElementById("usernameInput");
+const passwordInput = document.getElementById("passwordInput");
 const setUsernameBtn = document.getElementById("setUsernameBtn");
 const currentUserLabel = document.getElementById("currentUserLabel");
 
@@ -70,38 +64,52 @@ const postsContainer = document.getElementById("postsContainer");
 const feedTitle = document.getElementById("feedTitle");
 const clanButtons = document.querySelectorAll(".clan-btn");
 
-// ======================
-// 4. ROLE MANAGEMENT
-// ======================
-
-let promotedUsers = []; // from Firestore
-
+// 4. ROLES & PASSWORDS
 async function loadRoles() {
   const snap = await getDoc(metaDocRef);
   if (!snap.exists()) {
-    // initialize meta doc on first run
-    await setDoc(metaDocRef, { promoted: [] });
+    // First time setup: create basic structure
+    await setDoc(metaDocRef, {
+      promoted: [],
+      ownerPassword: "changeThisOwnerCode",
+      posterPasswords: {}
+    });
     promotedUsers = [];
+    ownerPassword = "changeThisOwnerCode";
+    posterPasswords = {};
+    alert(
+      "Owner password initialized as 'changeThisOwnerCode'. " +
+      "Please log in as Cloudstar with that password and change it in Firestore!"
+    );
   } else {
     const data = snap.data();
     promotedUsers = data.promoted || [];
+    ownerPassword = data.ownerPassword || "changeThisOwnerCode";
+    posterPasswords = data.posterPasswords || {};
   }
   renderPromotedList();
-  updateRoleFromUsername();
+  updateRoleFromUsername(); // but will check password
 }
 
 function renderPromotedList() {
   promotedList.innerHTML = "";
   promotedUsers.forEach((name) => {
     const li = document.createElement("li");
-    li.textContent = name;
+    li.textContent = name + " (poster)";
     promotedList.appendChild(li);
   });
 }
 
+// Only owner can call this from the UI
 async function promoteUser() {
+  if (currentRole !== "owner") {
+    alert("Only Cloudstar (owner) can promote posters.");
+    return;
+  }
+
   const name = promoteInput.value.trim();
   if (!name) return;
+
   if (name === OWNER_USERNAME) {
     alert("Cloudstar is already the owner.");
     return;
@@ -110,32 +118,75 @@ async function promoteUser() {
     alert("User is already promoted.");
     return;
   }
+
+  // Ask Cloudstar to set a password for this poster
+  const pwd = prompt(
+    `Set a password for ${name}.\n` +
+    "Tell this password only to that user so they can log in as a poster."
+  );
+  if (!pwd) {
+    alert("Promotion cancelled (no password set).");
+    return;
+  }
+
   promotedUsers.push(name);
-  await setDoc(metaDocRef, { promoted: promotedUsers }, { merge: true });
+  posterPasswords[name] = pwd;
+
+  await setDoc(
+    metaDocRef,
+    {
+      promoted: promotedUsers,
+      posterPasswords: posterPasswords
+    },
+    { merge: true }
+  );
+
   promoteInput.value = "";
   renderPromotedList();
-  alert(`Promoted ${name} as a poster.`);
+  alert(`Promoted ${name} as a poster. Password saved (but not shown again).`);
 }
 
+// Check username + password and set currentRole
 function updateRoleFromUsername() {
   if (!currentUser) {
     currentRole = "visitor";
-  } else if (currentUser === OWNER_USERNAME) {
-    currentRole = "owner";
-  } else if (promotedUsers.includes(currentUser)) {
-    currentRole = "poster";
-  } else {
+    applyRoleUI();
+    return;
+  }
+
+  const pwd = passwordInput.value.trim();
+
+  // Owner check
+  if (currentUser === OWNER_USERNAME) {
+    if (pwd && pwd === ownerPassword) {
+      currentRole = "owner";
+    } else {
+      currentRole = "visitor";
+      alert("Wrong password for Cloudstar.");
+    }
+  }
+  // Poster check
+  else if (promotedUsers.includes(currentUser)) {
+    const expected = posterPasswords[currentUser];
+    if (expected && pwd && pwd === expected) {
+      currentRole = "poster";
+    } else {
+      currentRole = "visitor";
+      alert("Wrong password for poster account.");
+    }
+  }
+  // Visitor
+  else {
     currentRole = "visitor";
   }
+
   applyRoleUI();
 }
 
 function applyRoleUI() {
-  if (!currentUser) {
-    currentUserLabel.textContent = "(no username set)";
-  } else {
-    currentUserLabel.textContent = `Logged in as: ${currentUser}`;
-  }
+  currentUserLabel.textContent = currentUser
+    ? `Logged in as: ${currentUser}`
+    : "(no username set)";
 
   if (currentRole === "owner") {
     roleBadge.textContent = "Owner";
@@ -155,12 +206,12 @@ function applyRoleUI() {
   }
 }
 
-// ======================
-// 5. POSTS HANDLING
-// ======================
-
-function renderPost(docSnap) {
+// 5. POSTS (with delete buttons)
+function renderPost(docObj) {
+  const docSnap = docObj.docSnap;
   const data = docSnap.data();
+  const id = docObj.id;
+
   const wrapper = document.createElement("article");
   wrapper.className = "post";
 
@@ -192,6 +243,28 @@ function renderPost(docSnap) {
   metaEl.appendChild(timeSpan);
   metaEl.appendChild(clanTag);
 
+  // Delete button for owner or the original author (if poster)
+  if (currentRole === "owner" || (currentRole === "poster" && currentUser === data.author)) {
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "Delete";
+    delBtn.style.marginLeft = "0.5rem";
+    delBtn.style.fontSize = "0.7rem";
+    delBtn.style.padding = "0.1rem 0.3rem";
+    delBtn.style.borderRadius = "4px";
+    delBtn.style.border = "none";
+    delBtn.style.cursor = "pointer";
+    delBtn.style.background = "#ef4444";
+    delBtn.style.color = "#fee2e2";
+
+    delBtn.addEventListener("click", async () => {
+      const ok = confirm("Delete this post?");
+      if (!ok) return;
+      await deleteDoc(doc(db, "clanPosts", id));
+    });
+
+    metaEl.appendChild(delBtn);
+  }
+
   header.appendChild(titleEl);
   header.appendChild(metaEl);
 
@@ -210,23 +283,10 @@ function clearPosts() {
 }
 
 function updateFeedTitle() {
-  if (currentClanFilter === "all") {
-    feedTitle.textContent = "All Clan News";
-  } else {
-    feedTitle.textContent = currentClanFilter + " News";
-  }
-}
-
-function setupPostsListener() {
-  const q = query(postsCol, orderBy("createdAt", "desc"));
-  onSnapshot(q, (snapshot) => {
-    // keep all posts in memory and filter client-side
-    const all = [];
-    snapshot.forEach((docSnap) => {
-      all.push({ id: docSnap.id, docSnap });
-    });
-    renderFilteredPosts(all);
-  });
+  feedTitle.textContent =
+    currentClanFilter === "all"
+      ? "All Clan News"
+      : currentClanFilter + " News";
 }
 
 function renderFilteredPosts(allPosts) {
@@ -245,14 +305,25 @@ function renderFilteredPosts(allPosts) {
   }
 
   filtered.forEach((p) => {
-    const postEl = renderPost(p.docSnap);
+    const postEl = renderPost(p);
     postsContainer.appendChild(postEl);
+  });
+}
+
+function setupPostsListener() {
+  const q = query(postsCol, orderBy("createdAt", "desc"));
+  onSnapshot(q, (snapshot) => {
+    lastSnapshotDocs = [];
+    snapshot.forEach((docSnap) => {
+      lastSnapshotDocs.push({ id: docSnap.id, docSnap });
+    });
+    renderFilteredPosts(lastSnapshotDocs);
   });
 }
 
 async function publishPost() {
   if (!currentUser) {
-    alert("Set a username first.");
+    alert("Set a username + password first.");
     return;
   }
   if (currentRole === "visitor") {
@@ -269,38 +340,37 @@ async function publishPost() {
     return;
   }
 
-  try {
-    await addDoc(postsCol, {
-      clan,
-      title: title || "(no title)",
-      body,
-      author: currentUser,
-      createdAt: new Date()
-    });
-    postTitleInput.value = "";
-    postBodyInput.value = "";
-  } catch (err) {
-    console.error(err);
-    alert("Error publishing post. Check console for details.");
-  }
+  await addDoc(postsCol, {
+    clan,
+    title: title || "(no title)",
+    body,
+    author: currentUser,
+    createdAt: new Date()
+  });
+
+  postTitleInput.value = "";
+  postBodyInput.value = "";
 }
 
-// ======================
-// 6. USERNAME HANDLING
-// ======================
-
-function setUsername() {
+// 6. USERNAME + PASSWORD LOGIN
+function setUsernameAndRole() {
   const name = usernameInput.value.trim();
-  if (!name) return;
+  if (!name) {
+    alert("Please enter a username.");
+    return;
+  }
+  if (!passwordInput.value.trim()) {
+    alert("Please enter a password.");
+    return;
+  }
+
   currentUser = name;
+  // We save only username locally, not password
   localStorage.setItem("tch_username", currentUser);
   updateRoleFromUsername();
 }
 
-// ======================
-// 7. CLAN FILTER BUTTONS
-// ======================
-
+// 7. CLAN BUTTONS
 function setupClanButtons() {
   clanButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -308,44 +378,20 @@ function setupClanButtons() {
       btn.classList.add("active");
       currentClanFilter = btn.dataset.clan;
       updateFeedTitle();
-      // the snapshot listener re-renders whenever data changes,
-      // but we also need to re-filter locally:
-      // easiest is to force a tiny reload using another query fetch:
-      // (simpler approach for now: just rely on onSnapshot's last data;
-      // we can store it in a variable.)
+      renderFilteredPosts(lastSnapshotDocs);
     });
   });
 }
 
-// improve: store last snapshot so filters work instantly
-let lastSnapshotDocs = [];
-function setupPostsListenerWithCache() {
-  const q = query(postsCol, orderBy("createdAt", "desc"));
-  onSnapshot(q, (snapshot) => {
-    lastSnapshotDocs = [];
-    snapshot.forEach((docSnap) => {
-      lastSnapshotDocs.push({ id: docSnap.id, docSnap });
-    });
-    renderFilteredPosts(lastSnapshotDocs);
-  });
-}
-
-// Overwrite older function call with cached version
-setupPostsListener = setupPostsListenerWithCache;
-
-// ======================
 // 8. INIT
-// ======================
-
 window.addEventListener("DOMContentLoaded", async () => {
-  // restore username from localStorage
   const stored = localStorage.getItem("tch_username");
   if (stored) {
     currentUser = stored;
     usernameInput.value = stored;
   }
 
-  setUsernameBtn.addEventListener("click", setUsername);
+  setUsernameBtn.addEventListener("click", setUsernameAndRole);
   publishBtn.addEventListener("click", publishPost);
   promoteBtn.addEventListener("click", promoteUser);
 
