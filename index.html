@@ -8,6 +8,22 @@
   <script type="module" src="script.js" defer></script>
 </head>
 <body>
+  <!-- Confirmation Modal -->
+  <div id="confirmModal" class="modal-overlay">
+    <div class="modal-box">
+      <h2>Twinkle Confirmation</h2>
+      <p>Enter the confirmation password to unlock login and posting.</p>
+      <input
+        id="confirmCodeModalInput"
+        type="password"
+        placeholder="Enter confirmation password"
+      />
+      <button id="confirmCodeBtn">Unlock</button>
+      <p id="confirmMessage" class="modal-message"></p>
+      <p class="tiny-hint">Visitors can still read posts without unlocking.</p>
+    </div>
+  </div>
+
   <header>
     <h1>Twinkle Clans Hub</h1>
     <p class="subtitle">News center for WindClan, RiverClan, ThunderClan, and ShadowClan</p>
@@ -20,9 +36,6 @@
 
       <label for="passwordInput" style="margin-left:0.5rem;">Password:</label>
       <input id="passwordInput" type="password" placeholder="Enter password" />
-
-      <label for="confirmCodeInput" style="margin-left:0.5rem;">Confirmation password:</label>
-      <input id="confirmCodeInput" type="password" placeholder="Enter confirmation password" />
 
       <button id="setUsernameBtn">Set User</button>
       <span id="currentUserLabel"></span>
