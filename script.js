@@ -38,10 +38,10 @@ const OWNER_PASSWORD = "Cloudstar7Wind";
 const CONFIRMATION_CODE = "WCU";
 
 const FIXED_POSTER_PASSWORDS = {
-  "Pinestar": "PineThunder",
-  "Grapestar": "GrapeShadow",
-  "Willowshine": "Willowshine7",
-  "Lakestar": "LakestarRiver"
+  Pinestar: "PineThunder",
+  Grapestar: "GrapeShadow",
+  Willowshine: "Willowshine7",
+  Lakestar: "LakestarRiver"
 };
 
 let currentUser = null;
@@ -49,7 +49,6 @@ let currentRole = "visitor";
 let currentClanFilter = "all";
 let promotedUsers = [];
 let posterPasswords = { ...FIXED_POSTER_PASSWORDS };
-let ownerPassword = OWNER_PASSWORD;
 let lastSnapshotDocs = [];
 let confirmationUnlocked = false;
 
@@ -76,21 +75,19 @@ const postsContainer = document.getElementById("postsContainer");
 const feedTitle = document.getElementById("feedTitle");
 const clanButtons = document.querySelectorAll(".clan-btn");
 
-// modal
 const confirmModal = document.getElementById("confirmModal");
 const confirmCodeModalInput = document.getElementById("confirmCodeModalInput");
 const confirmCodeBtn = document.getElementById("confirmCodeBtn");
 const confirmMessage = document.getElementById("confirmMessage");
 
-// --- 5. ROLES & PASSWORDS ---
+// --- 5. ROLE LOADING ---
 
 async function loadRoles() {
   const snap = await getDoc(metaDocRef);
+
   if (!snap.exists()) {
     const initialPromoted = Object.keys(FIXED_POSTER_PASSWORDS);
-    await setDoc(metaDocRef, {
-      promoted: initialPromoted
-    });
+    await setDoc(metaDocRef, { promoted: initialPromoted });
     promotedUsers = initialPromoted;
   } else {
     const data = snap.data();
@@ -98,7 +95,6 @@ async function loadRoles() {
   }
 
   posterPasswords = { ...FIXED_POSTER_PASSWORDS };
-  ownerPassword = OWNER_PASSWORD;
 
   renderPromotedList();
   updateRoleFromUsername();
@@ -107,9 +103,10 @@ async function loadRoles() {
 function renderPromotedList() {
   if (!promotedList) return;
   promotedList.innerHTML = "";
+
   promotedUsers.forEach((name) => {
     const li = document.createElement("li");
-    li.textContent = name + " (poster)";
+    li.textContent = `${name} (poster)`;
     promotedList.appendChild(li);
   });
 }
@@ -132,32 +129,24 @@ async function promoteUser() {
     alert("Cloudstar is already the owner.");
     return;
   }
+
   if (promotedUsers.includes(name)) {
     alert("User is already promoted.");
     return;
   }
 
   if (!FIXED_POSTER_PASSWORDS[name]) {
-    alert(
-      "This username does not have a fixed password set in the code.\n" +
-      "Ask Zero to add a password for this username first."
-    );
+    alert("That username does not have a fixed password in the code yet.");
     return;
   }
 
   promotedUsers.push(name);
 
-  await setDoc(
-    metaDocRef,
-    {
-      promoted: promotedUsers
-    },
-    { merge: true }
-  );
+  await setDoc(metaDocRef, { promoted: promotedUsers }, { merge: true });
 
   promoteInput.value = "";
   renderPromotedList();
-  alert(`Promoted ${name} as a poster with their fixed password.`);
+  alert(`${name} was promoted as a poster.`);
 }
 
 function updateRoleFromUsername() {
@@ -200,15 +189,23 @@ function applyRoleUI() {
 
   if (!roleBadge || !posterControls || !ownerControls) return;
 
+  if (!confirmationUnlocked) {
+    roleBadge.textContent = "Visitor";
+    roleBadge.style.background = "#4b5563";
+    posterControls.style.display = "none";
+    ownerControls.style.display = "none";
+    return;
+  }
+
   if (currentRole === "owner") {
     roleBadge.textContent = "Owner";
     roleBadge.style.background = "#eab308";
-    posterControls.style.display = confirmationUnlocked ? "block" : "none";
-    ownerControls.style.display = confirmationUnlocked ? "block" : "none";
+    posterControls.style.display = "block";
+    ownerControls.style.display = "block";
   } else if (currentRole === "poster") {
     roleBadge.textContent = "Poster";
     roleBadge.style.background = "#22c55e";
-    posterControls.style.display = confirmationUnlocked ? "block" : "none";
+    posterControls.style.display = "block";
     ownerControls.style.display = "none";
   } else {
     roleBadge.textContent = "Visitor";
@@ -218,9 +215,11 @@ function applyRoleUI() {
   }
 }
 
-// --- 6. CONFIRMATION MODAL ---
+// --- 6. CONFIRM MODAL ---
 
 function unlockConfirmation() {
+  if (!confirmCodeModalInput || !confirmModal || !confirmMessage) return;
+
   const value = confirmCodeModalInput.value.trim();
 
   if (value === CONFIRMATION_CODE) {
@@ -228,7 +227,6 @@ function unlockConfirmation() {
     confirmModal.style.display = "none";
     confirmMessage.textContent = "";
     applyRoleUI();
-    alert("Confirmation accepted. Login and posting are now unlocked.");
   } else {
     confirmationUnlocked = false;
     confirmMessage.textContent = "Wrong confirmation password.";
@@ -273,7 +271,7 @@ function renderPost(docObj) {
   metaEl.appendChild(timeSpan);
   metaEl.appendChild(clanTag);
 
-  if (currentRole === "owner" && currentUser === "Cloudstar") {
+  if (confirmationUnlocked && currentRole === "owner" && currentUser === "Cloudstar") {
     const delBtn = document.createElement("button");
     delBtn.textContent = "Delete";
     delBtn.style.marginLeft = "0.5rem";
@@ -313,10 +311,11 @@ function clearPosts() {
 
 function updateFeedTitle() {
   if (!feedTitle) return;
+
   feedTitle.textContent =
     currentClanFilter === "all"
       ? "All Clan News"
-      : currentClanFilter + " News";
+      : `${currentClanFilter} News`;
 }
 
 function renderFilteredPosts(allPosts) {
@@ -337,13 +336,13 @@ function renderFilteredPosts(allPosts) {
   }
 
   filtered.forEach((p) => {
-    const postEl = renderPost(p);
-    postsContainer.appendChild(postEl);
+    postsContainer.appendChild(renderPost(p));
   });
 }
 
 function setupPostsListener() {
   const q = query(postsCol, orderBy("createdAt", "desc"));
+
   onSnapshot(q, (snapshot) => {
     lastSnapshotDocs = [];
     snapshot.forEach((docSnap) => {
@@ -399,11 +398,14 @@ function setUsernameAndRole() {
   }
 
   const name = usernameInput.value.trim();
+  const pwd = passwordInput.value.trim();
+
   if (!name) {
     alert("Please enter a username.");
     return;
   }
-  if (!passwordInput.value.trim()) {
+
+  if (!pwd) {
     alert("Please enter a password.");
     return;
   }
@@ -413,7 +415,7 @@ function setUsernameAndRole() {
   updateRoleFromUsername();
 }
 
-// --- 9. CLAN FILTER BUTTONS ---
+// --- 9. CLAN BUTTONS ---
 
 function setupClanButtons() {
   clanButtons.forEach((btn) => {
@@ -431,7 +433,7 @@ function setupClanButtons() {
 
 window.addEventListener("DOMContentLoaded", async () => {
   const stored = localStorage.getItem("tch_username");
-  if (stored) {
+  if (stored && usernameInput) {
     currentUser = stored;
     usernameInput.value = stored;
   }
