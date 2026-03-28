@@ -5,7 +5,6 @@
   <title>Twinkle Clans Hub</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="style.css" />
-  <!-- Only ONE module script -->
   <script type="module" src="script.js" defer></script>
 </head>
 <body>
@@ -15,16 +14,19 @@
   </header>
 
   <section class="top-bar">
-  <div class="username-box">
-  <label for="usernameInput">Username:</label>
-  <input id="usernameInput" type="text" placeholder="Enter your username" />
+    <div class="username-box">
+      <label for="usernameInput">Username:</label>
+      <input id="usernameInput" type="text" placeholder="Enter your username" />
 
-  <label for="passwordInput" style="margin-left:0.5rem;">Password:</label>
-  <input id="passwordInput" type="password" placeholder="Enter password" />
+      <label for="passwordInput" style="margin-left:0.5rem;">Password:</label>
+      <input id="passwordInput" type="password" placeholder="Enter password" />
 
-  <button id="setUsernameBtn">Set User</button>
-  <span id="currentUserLabel"></span>
-</div>
+      <label for="confirmCodeInput" style="margin-left:0.5rem;">Confirmation password:</label>
+      <input id="confirmCodeInput" type="password" placeholder="Enter confirmation password" />
+
+      <button id="setUsernameBtn">Set User</button>
+      <span id="currentUserLabel"></span>
+    </div>
 
     <div class="role-info">
       <span id="roleBadge">Visitor</span>
