@@ -94,7 +94,7 @@ async function loadRoles() {
   ownerPassword = OWNER_PASSWORD;
 
   renderPromotedList();
-  updateRoleFromUsername(); // sets currentRole + UI based on currentUser/password
+  updateRoleFromUsername();
 }
 
 function renderPromotedList() {
@@ -157,7 +157,6 @@ function updateRoleFromUsername() {
 
   const pwd = passwordInput.value.trim();
 
-  // owner
   if (currentUser === OWNER_USERNAME) {
     if (pwd && pwd === OWNER_PASSWORD) {
       currentRole = "owner";
@@ -165,9 +164,7 @@ function updateRoleFromUsername() {
       currentRole = "visitor";
       if (pwd !== "") alert("Wrong password for Cloudstar.");
     }
-  }
-  // poster
-  else if (promotedUsers.includes(currentUser)) {
+  } else if (promotedUsers.includes(currentUser)) {
     const expected = posterPasswords[currentUser];
     if (expected && pwd && pwd === expected) {
       currentRole = "poster";
@@ -175,9 +172,7 @@ function updateRoleFromUsername() {
       currentRole = "visitor";
       if (pwd !== "") alert("Wrong password for poster account.");
     }
-  }
-  // visitor
-  else {
+  } else {
     currentRole = "visitor";
   }
 
@@ -249,8 +244,8 @@ function renderPost(docObj) {
   metaEl.appendChild(timeSpan);
   metaEl.appendChild(clanTag);
 
-  // delete button
-  if (currentRole === "owner" || (currentRole === "poster" && currentUser === data.author)) {
+  // delete button: ONLY Cloudstar can delete
+  if (currentRole === "owner" && currentUser === "Cloudstar") {
     const delBtn = document.createElement("button");
     delBtn.textContent = "Delete";
     delBtn.style.marginLeft = "0.5rem";
@@ -263,7 +258,7 @@ function renderPost(docObj) {
     delBtn.style.color = "#fee2e2";
 
     delBtn.addEventListener("click", async () => {
-      const ok = confirm("Delete this post?");
+      const ok = confirm(`Delete "${data.title || "(no title)"}" permanently?`);
       if (!ok) return;
       await deleteDoc(doc(db, "clanPosts", id));
     });
@@ -326,7 +321,6 @@ function setupPostsListener() {
     snapshot.forEach((docSnap) => {
       lastSnapshotDocs.push({ id: docSnap.id, docSnap });
     });
-    // always render posts, even for visitors
     renderFilteredPosts(lastSnapshotDocs);
   });
 }
