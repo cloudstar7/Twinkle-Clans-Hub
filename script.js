@@ -1,3 +1,4 @@
+// --- 1. IMPORTS ---
 import {
   initializeApp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -14,7 +15,7 @@ import {
   deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// Your web app's Firebase configuration
+// --- 2. FIREBASE CONFIG ---
 const firebaseConfig = {
   apiKey: "AIzaSyAj04SX2YrStdZFWXkMowRxwBYM7xO2mSg",
   authDomain: "twinkle-clans-hub.firebaseapp.com",
@@ -24,39 +25,34 @@ const firebaseConfig = {
   appId: "1:443187160032:web:e6408e6043b7a607a60185"
 };
 
-// Initialize Firebase
+// init
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const postsCol = collection(db, "clanPosts");
 const metaDocRef = doc(db, "meta", "roles");
 
-// 2. STATE
-const OWNER_USERNAME = "Cloudstar";
-const postsCol = collection(db, "clanPosts");
-const metaDocRef = doc(db, "meta", "roles");
-
-// 2. STATE
+// --- 3. STATE ---
 const OWNER_USERNAME = "Cloudstar";
 
-// FIXED PASSWORDS
+// FIXED PASSWORDS (no numbers in usernames)
 const OWNER_PASSWORD = "Cloudstar7Wind";
 const FIXED_POSTER_PASSWORDS = {
-  "Pinestar(0)": "PineThunder",
-  "Grapestar(1)": "GrapeShadow",
-  "Willowshine(2)": "Willowshine7",
-  "Lakestar(3)": "LakestarRiver"
+  "Pinestar": "PineThunder",
+  "Grapestar": "GrapeShadow",
+  "Willowshine": "Willowshine7",
+  "Lakestar": "LakestarRiver"
 };
 
 let currentUser = null;
 let currentRole = "visitor";
 let currentClanFilter = "all";
 let promotedUsers = [];
-let posterPasswords = { ...FIXED_POSTER_PASSWORDS }; // start with fixed ones
-let ownerPassword = OWNER_PASSWORD; // keep for compatibility
+let posterPasswords = { ...FIXED_POSTER_PASSWORDS };
+let ownerPassword = OWNER_PASSWORD;
 let lastSnapshotDocs = [];
 
-// 3. DOM
+// --- 4. DOM ELEMENTS ---
 const usernameInput = document.getElementById("usernameInput");
 const passwordInput = document.getElementById("passwordInput");
 const setUsernameBtn = document.getElementById("setUsernameBtn");
@@ -79,11 +75,11 @@ const postsContainer = document.getElementById("postsContainer");
 const feedTitle = document.getElementById("feedTitle");
 const clanButtons = document.querySelectorAll(".clan-btn");
 
-// 4. ROLES & PASSWORDS
+// --- 5. ROLES & PASSWORDS ---
+
 async function loadRoles() {
   const snap = await getDoc(metaDocRef);
   if (!snap.exists()) {
-    // First time: create promoted list for your fixed posters only
     const initialPromoted = Object.keys(FIXED_POSTER_PASSWORDS);
     await setDoc(metaDocRef, {
       promoted: initialPromoted
@@ -94,15 +90,15 @@ async function loadRoles() {
     promotedUsers = data.promoted || Object.keys(FIXED_POSTER_PASSWORDS);
   }
 
-  // Always enforce our fixed passwords in code
   posterPasswords = { ...FIXED_POSTER_PASSWORDS };
   ownerPassword = OWNER_PASSWORD;
 
   renderPromotedList();
-  updateRoleFromUsername();
+  updateRoleFromUsername(); // sets currentRole + UI based on currentUser/password
 }
 
 function renderPromotedList() {
+  if (!promotedList) return;
   promotedList.innerHTML = "";
   promotedUsers.forEach((name) => {
     const li = document.createElement("li");
@@ -111,7 +107,6 @@ function renderPromotedList() {
   });
 }
 
-// Only owner can call this from the UI
 async function promoteUser() {
   if (currentRole !== "owner") {
     alert("Only Cloudstar (owner) can promote posters.");
@@ -130,34 +125,29 @@ async function promoteUser() {
     return;
   }
 
-  // Ask Cloudstar to set a password for this poster
-  const pwd = prompt(
-    `Set a password for ${name}.\n` +
-    "Tell this password only to that user so they can log in as a poster."
-  );
-  if (!pwd) {
-    alert("Promotion cancelled (no password set).");
+  if (!FIXED_POSTER_PASSWORDS[name]) {
+    alert(
+      "This username does not have a fixed password set in the code.\n" +
+      "Ask Zero to add a password for this username first."
+    );
     return;
   }
 
   promotedUsers.push(name);
-  posterPasswords[name] = pwd;
 
   await setDoc(
     metaDocRef,
     {
-      promoted: promotedUsers,
-      posterPasswords: posterPasswords
+      promoted: promotedUsers
     },
     { merge: true }
   );
 
   promoteInput.value = "";
   renderPromotedList();
-  alert(`Promoted ${name} as a poster. Password saved (but not shown again).`);
+  alert(`Promoted ${name} as a poster with their fixed password.`);
 }
 
-// Check username + password and set currentRole
 function updateRoleFromUsername() {
   if (!currentUser) {
     currentRole = "visitor";
@@ -167,30 +157,26 @@ function updateRoleFromUsername() {
 
   const pwd = passwordInput.value.trim();
 
-  // Owner check
+  // owner
   if (currentUser === OWNER_USERNAME) {
     if (pwd && pwd === OWNER_PASSWORD) {
       currentRole = "owner";
     } else {
       currentRole = "visitor";
-      if (pwd !== "") {
-        alert("Wrong password for Cloudstar.");
-      }
+      if (pwd !== "") alert("Wrong password for Cloudstar.");
     }
   }
-  // Poster check
+  // poster
   else if (promotedUsers.includes(currentUser)) {
     const expected = posterPasswords[currentUser];
     if (expected && pwd && pwd === expected) {
       currentRole = "poster";
     } else {
       currentRole = "visitor";
-      if (pwd !== "") {
-        alert("Wrong password for poster account.");
-      }
+      if (pwd !== "") alert("Wrong password for poster account.");
     }
   }
-  // Visitor
+  // visitor
   else {
     currentRole = "visitor";
   }
@@ -199,9 +185,13 @@ function updateRoleFromUsername() {
 }
 
 function applyRoleUI() {
-  currentUserLabel.textContent = currentUser
-    ? `Logged in as: ${currentUser}`
-    : "(no username set)";
+  if (currentUserLabel) {
+    currentUserLabel.textContent = currentUser
+      ? `Logged in as: ${currentUser}`
+      : "(no username set)";
+  }
+
+  if (!roleBadge || !posterControls || !ownerControls) return;
 
   if (currentRole === "owner") {
     roleBadge.textContent = "Owner";
@@ -221,7 +211,8 @@ function applyRoleUI() {
   }
 }
 
-// 5. POSTS (with delete buttons)
+// --- 6. POSTS ---
+
 function renderPost(docObj) {
   const docSnap = docObj.docSnap;
   const data = docSnap.data();
@@ -258,7 +249,7 @@ function renderPost(docObj) {
   metaEl.appendChild(timeSpan);
   metaEl.appendChild(clanTag);
 
-  // Delete button for owner or the original author (if poster)
+  // delete button
   if (currentRole === "owner" || (currentRole === "poster" && currentUser === data.author)) {
     const delBtn = document.createElement("button");
     delBtn.textContent = "Delete";
@@ -294,10 +285,11 @@ function renderPost(docObj) {
 }
 
 function clearPosts() {
-  postsContainer.innerHTML = "";
+  if (postsContainer) postsContainer.innerHTML = "";
 }
 
 function updateFeedTitle() {
+  if (!feedTitle) return;
   feedTitle.textContent =
     currentClanFilter === "all"
       ? "All Clan News"
@@ -306,6 +298,8 @@ function updateFeedTitle() {
 
 function renderFilteredPosts(allPosts) {
   clearPosts();
+  if (!postsContainer) return;
+
   const filtered = allPosts.filter((p) => {
     if (currentClanFilter === "all") return true;
     return p.docSnap.data().clan === currentClanFilter;
@@ -332,6 +326,7 @@ function setupPostsListener() {
     snapshot.forEach((docSnap) => {
       lastSnapshotDocs.push({ id: docSnap.id, docSnap });
     });
+    // always render posts, even for visitors
     renderFilteredPosts(lastSnapshotDocs);
   });
 }
@@ -367,8 +362,8 @@ async function publishPost() {
   postBodyInput.value = "";
 }
 
-// 6. USERNAME + PASSWORD LOGIN
-// 6. USERNAME + PASSWORD LOGIN
+// --- 7. LOGIN ---
+
 function setUsernameAndRole() {
   const name = usernameInput.value.trim();
   if (!name) {
@@ -381,11 +376,12 @@ function setUsernameAndRole() {
   }
 
   currentUser = name;
-  // We save only username locally, not password
   localStorage.setItem("tch_username", currentUser);
   updateRoleFromUsername();
 }
-// 7. CLAN BUTTONS
+
+// --- 8. CLAN FILTER BUTTONS ---
+
 function setupClanButtons() {
   clanButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -398,7 +394,8 @@ function setupClanButtons() {
   });
 }
 
-// 8. INIT
+// --- 9. INIT ---
+
 window.addEventListener("DOMContentLoaded", async () => {
   const stored = localStorage.getItem("tch_username");
   if (stored) {
@@ -406,9 +403,9 @@ window.addEventListener("DOMContentLoaded", async () => {
     usernameInput.value = stored;
   }
 
-  setUsernameBtn.addEventListener("click", setUsernameAndRole);
-  publishBtn.addEventListener("click", publishPost);
-  promoteBtn.addEventListener("click", promoteUser);
+  if (setUsernameBtn) setUsernameBtn.addEventListener("click", setUsernameAndRole);
+  if (publishBtn) publishBtn.addEventListener("click", publishPost);
+  if (promoteBtn) promoteBtn.addEventListener("click", promoteUser);
 
   setupClanButtons();
   updateFeedTitle();
