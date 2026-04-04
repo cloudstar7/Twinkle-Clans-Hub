@@ -2,6 +2,7 @@
 import {
   initializeApp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+
 import {
   getFirestore,
   collection,
@@ -30,7 +31,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 const postsCol = collection(db, "clanPosts");
+const commentsCol = collection(db, "comments");
 const metaDocRef = doc(db, "meta", "roles");
+const usersCol = collection(db, "users");
 
 // --- 3. STATE ---
 const OWNER_USERNAME = "Cloudstar";
@@ -50,6 +53,7 @@ let currentClanFilter = "all";
 let promotedUsers = [];
 let posterPasswords = { ...FIXED_POSTER_PASSWORDS };
 let lastSnapshotDocs = [];
+let allComments = [];
 let confirmationUnlocked = false;
 
 // --- 4. DOM ELEMENTS ---
@@ -80,7 +84,23 @@ const confirmCodeModalInput = document.getElementById("confirmCodeModalInput");
 const confirmCodeBtn = document.getElementById("confirmCodeBtn");
 const confirmMessage = document.getElementById("confirmMessage");
 
-// --- 5. ROLE LOADING ---
+// --- 5. HELPERS ---
+
+function isReservedUsername(name) {
+  if (!name) return false;
+  if (name === OWNER_USERNAME) return true;
+  return Object.prototype.hasOwnProperty.call(FIXED_POSTER_PASSWORDS, name);
+}
+
+function normalizeUsername(name) {
+  return name.trim();
+}
+
+function getUserDocRef(username) {
+  return doc(db, "users", username);
+}
+
+// --- 6. ROLE LOADING ---
 
 async function loadRoles() {
   const snap = await getDoc(metaDocRef);
@@ -97,7 +117,7 @@ async function loadRoles() {
   posterPasswords = { ...FIXED_POSTER_PASSWORDS };
 
   renderPromotedList();
-  updateRoleFromUsername();
+  applyRoleUI();
 }
 
 function renderPromotedList() {
@@ -146,6 +166,7 @@ async function promoteUser() {
 
   promoteInput.value = "";
   renderPromotedList();
+  updateRoleFromUsername();
   alert(`${name} was promoted as a poster.`);
 }
 
@@ -153,43 +174,40 @@ function updateRoleFromUsername() {
   if (!currentUser) {
     currentRole = "visitor";
     applyRoleUI();
+    renderFilteredPosts(lastSnapshotDocs);
     return;
   }
 
-  const pwd = passwordInput.value.trim();
-
   if (currentUser === OWNER_USERNAME) {
-    if (pwd && pwd === OWNER_PASSWORD) {
-      currentRole = "owner";
-    } else {
-      currentRole = "visitor";
-      if (pwd !== "") alert("Wrong password for Cloudstar.");
-    }
+    currentRole = "owner";
   } else if (promotedUsers.includes(currentUser)) {
-    const expected = posterPasswords[currentUser];
-    if (expected && pwd && pwd === expected) {
-      currentRole = "poster";
-    } else {
-      currentRole = "visitor";
-      if (pwd !== "") alert("Wrong password for poster account.");
-    }
+    currentRole = "poster";
   } else {
-    currentRole = "visitor";
+    currentRole = "member";
   }
 
   applyRoleUI();
+  renderFilteredPosts(lastSnapshotDocs);
 }
 
 function applyRoleUI() {
   if (currentUserLabel) {
     currentUserLabel.textContent = currentUser
       ? `Logged in as: ${currentUser}`
-      : "(no username set)";
+      : "(not logged in)";
   }
 
   if (!roleBadge || !posterControls || !ownerControls) return;
 
   if (!confirmationUnlocked) {
+    roleBadge.textContent = "Locked";
+    roleBadge.style.background = "#4b5563";
+    posterControls.style.display = "none";
+    ownerControls.style.display = "none";
+    return;
+  }
+
+  if (!currentUser) {
     roleBadge.textContent = "Visitor";
     roleBadge.style.background = "#4b5563";
     posterControls.style.display = "none";
@@ -208,14 +226,14 @@ function applyRoleUI() {
     posterControls.style.display = "block";
     ownerControls.style.display = "none";
   } else {
-    roleBadge.textContent = "Visitor";
-    roleBadge.style.background = "#4b5563";
+    roleBadge.textContent = "Member";
+    roleBadge.style.background = "#3b82f6";
     posterControls.style.display = "none";
     ownerControls.style.display = "none";
   }
 }
 
-// --- 6. CONFIRM MODAL ---
+// --- 7. CONFIRM MODAL ---
 
 function unlockConfirmation() {
   if (!confirmCodeModalInput || !confirmModal || !confirmMessage) return;
@@ -227,13 +245,241 @@ function unlockConfirmation() {
     confirmModal.style.display = "none";
     confirmMessage.textContent = "";
     applyRoleUI();
+    renderFilteredPosts(lastSnapshotDocs);
   } else {
     confirmationUnlocked = false;
     confirmMessage.textContent = "Wrong confirmation password.";
   }
 }
 
-// --- 7. POSTS ---
+// --- 8. ACCOUNT / LOGIN SYSTEM ---
+
+async function setUsernameAndRole() {
+  if (!confirmationUnlocked) {
+    alert("Enter the confirmation password in the popup first.");
+    return;
+  }
+
+  const rawName = usernameInput.value.trim();
+  const name = normalizeUsername(rawName);
+  const pwd = passwordInput.value.trim();
+
+  if (!name) {
+    alert("Please enter a username.");
+    return;
+  }
+
+  if (!pwd) {
+    alert("Please enter a password.");
+    return;
+  }
+
+  if (name.includes("/")) {
+    alert("Username cannot include /");
+    return;
+  }
+
+  // OWNER LOGIN
+  if (name === OWNER_USERNAME) {
+    if (pwd !== OWNER_PASSWORD) {
+      alert("Wrong password for Cloudstar.");
+      return;
+    }
+
+    currentUser = name;
+    localStorage.setItem("tch_username", currentUser);
+    updateRoleFromUsername();
+    return;
+  }
+
+  // FIXED PROMOTED USER LOGIN
+  if (Object.prototype.hasOwnProperty.call(FIXED_POSTER_PASSWORDS, name)) {
+    if (pwd !== FIXED_POSTER_PASSWORDS[name]) {
+      alert("Wrong password for poster account.");
+      return;
+    }
+
+    currentUser = name;
+    localStorage.setItem("tch_username", currentUser);
+    updateRoleFromUsername();
+    return;
+  }
+
+  // NORMAL USER LOGIN / REGISTRATION
+  const userRef = getUserDocRef(name);
+  const snap = await getDoc(userRef);
+
+  if (!snap.exists()) {
+    await setDoc(userRef, {
+      username: name,
+      password: pwd,
+      createdAt: new Date()
+    });
+
+    currentUser = name;
+    localStorage.setItem("tch_username", currentUser);
+    updateRoleFromUsername();
+    alert(`Username "${name}" has been claimed and registered.`);
+    return;
+  }
+
+  const data = snap.data();
+
+  if (data.password !== pwd) {
+    alert("That username is already taken, and the password is incorrect.");
+    return;
+  }
+
+  currentUser = name;
+  localStorage.setItem("tch_username", currentUser);
+  updateRoleFromUsername();
+}
+
+// --- 9. COMMENTS ---
+
+function getCommentsForPost(postId) {
+  return allComments
+    .filter((comment) => comment.data.postId === postId)
+    .sort((a, b) => {
+      const aTime = a.data.createdAt?.toDate
+        ? a.data.createdAt.toDate().getTime()
+        : new Date(a.data.createdAt || 0).getTime();
+
+      const bTime = b.data.createdAt?.toDate
+        ? b.data.createdAt.toDate().getTime()
+        : new Date(b.data.createdAt || 0).getTime();
+
+      return aTime - bTime;
+    });
+}
+
+async function addComment(postId, inputEl) {
+  if (!confirmationUnlocked) {
+    alert("Enter the confirmation password in the popup first.");
+    return;
+  }
+
+  if (!currentUser) {
+    alert("You must log in first to comment.");
+    return;
+  }
+
+  const text = inputEl.value.trim();
+  if (!text) {
+    alert("Comment cannot be empty.");
+    return;
+  }
+
+  await addDoc(commentsCol, {
+    postId,
+    author: currentUser,
+    body: text,
+    createdAt: new Date()
+  });
+
+  inputEl.value = "";
+}
+
+async function deleteComment(commentId) {
+  if (!(confirmationUnlocked && currentRole === "owner" && currentUser === "Cloudstar")) {
+    alert("Only Cloudstar can delete comments.");
+    return;
+  }
+
+  const ok = confirm("Delete this comment permanently?");
+  if (!ok) return;
+
+  await deleteDoc(doc(db, "comments", commentId));
+}
+
+function renderCommentsSection(postId) {
+  const section = document.createElement("div");
+  section.className = "comments-section";
+
+  const heading = document.createElement("div");
+  heading.className = "comments-heading";
+  heading.textContent = "Comments";
+
+  const list = document.createElement("div");
+  list.className = "comments-list";
+
+  const comments = getCommentsForPost(postId);
+
+  if (comments.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "comments-empty";
+    empty.textContent = "No comments yet.";
+    list.appendChild(empty);
+  } else {
+    comments.forEach((comment) => {
+      const item = document.createElement("div");
+      item.className = "comment-item";
+
+      const meta = document.createElement("div");
+      meta.className = "comment-meta";
+
+      const author = document.createElement("span");
+      author.textContent = comment.data.author || "Unknown";
+
+      const time = document.createElement("span");
+      const date = comment.data.createdAt?.toDate
+        ? comment.data.createdAt.toDate()
+        : new Date(comment.data.createdAt || Date.now());
+      time.textContent = " · " + date.toLocaleString();
+
+      meta.appendChild(author);
+      meta.appendChild(time);
+
+      if (confirmationUnlocked && currentRole === "owner" && currentUser === "Cloudstar") {
+        const delBtn = document.createElement("button");
+        delBtn.className = "comment-delete-btn";
+        delBtn.textContent = "Delete";
+        delBtn.addEventListener("click", () => deleteComment(comment.id));
+        meta.appendChild(delBtn);
+      }
+
+      const body = document.createElement("div");
+      body.className = "comment-body";
+      body.textContent = comment.data.body;
+
+      item.appendChild(meta);
+      item.appendChild(body);
+      list.appendChild(item);
+    });
+  }
+
+  const form = document.createElement("div");
+  form.className = "comment-form";
+
+  const input = document.createElement("textarea");
+  input.className = "comment-input";
+  input.rows = 2;
+  input.placeholder = currentUser
+    ? "Write a comment..."
+    : "Log in to write a comment";
+
+  const btn = document.createElement("button");
+  btn.className = "comment-btn";
+  btn.textContent = "Comment";
+
+  if (!confirmationUnlocked || !currentUser) {
+    input.disabled = true;
+    btn.disabled = true;
+  }
+
+  btn.addEventListener("click", () => addComment(postId, input));
+
+  form.appendChild(input);
+  form.appendChild(btn);
+
+  section.appendChild(heading);
+  section.appendChild(list);
+  section.appendChild(form);
+
+  return section;
+}
+
+// --- 10. POSTS ---
 
 function renderPost(docObj) {
   const docSnap = docObj.docSnap;
@@ -301,6 +547,7 @@ function renderPost(docObj) {
 
   wrapper.appendChild(header);
   wrapper.appendChild(bodyEl);
+  wrapper.appendChild(renderCommentsSection(id));
 
   return wrapper;
 }
@@ -352,6 +599,21 @@ function setupPostsListener() {
   });
 }
 
+function setupCommentsListener() {
+  const q = query(commentsCol, orderBy("createdAt", "asc"));
+
+  onSnapshot(q, (snapshot) => {
+    allComments = [];
+    snapshot.forEach((docSnap) => {
+      allComments.push({
+        id: docSnap.id,
+        data: docSnap.data()
+      });
+    });
+    renderFilteredPosts(lastSnapshotDocs);
+  });
+}
+
 async function publishPost() {
   if (!confirmationUnlocked) {
     alert("Enter the confirmation password in the popup first.");
@@ -363,8 +625,8 @@ async function publishPost() {
     return;
   }
 
-  if (currentRole === "visitor") {
-    alert("You do not have permission to post.");
+  if (!(currentRole === "owner" || currentRole === "poster")) {
+    alert("Only promoted users can post.");
     return;
   }
 
@@ -389,52 +651,11 @@ async function publishPost() {
   postBodyInput.value = "";
 }
 
-// --- 8. LOGIN ---
-
-function setUsernameAndRole() {
-  if (!confirmationUnlocked) {
-    alert("Enter the confirmation password in the popup first.");
-    return;
-  }
-
-  const name = usernameInput.value.trim();
-  const pwd = passwordInput.value.trim();
-
-  if (!name) {
-    alert("Please enter a username.");
-    return;
-  }
-
-  if (!pwd) {
-    alert("Please enter a password.");
-    return;
-  }
-
-  currentUser = name;
-  localStorage.setItem("tch_username", currentUser);
-  updateRoleFromUsername();
-}
-
-// --- 9. CLAN BUTTONS ---
-
-function setupClanButtons() {
-  clanButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      clanButtons.forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      currentClanFilter = btn.dataset.clan;
-      updateFeedTitle();
-      renderFilteredPosts(lastSnapshotDocs);
-    });
-  });
-}
-
-// --- 10. INIT ---
+// --- 11. INIT ---
 
 window.addEventListener("DOMContentLoaded", async () => {
   const stored = localStorage.getItem("tch_username");
   if (stored && usernameInput) {
-    currentUser = stored;
     usernameInput.value = stored;
   }
 
@@ -454,4 +675,18 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   await loadRoles();
   setupPostsListener();
+  setupCommentsListener();
 });
+
+// --- 12. CLAN BUTTONS ---
+function setupClanButtons() {
+  clanButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      clanButtons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentClanFilter = btn.dataset.clan;
+      updateFeedTitle();
+      renderFilteredPosts(lastSnapshotDocs);
+    });
+  });
+}
